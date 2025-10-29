@@ -49,13 +49,15 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
 
   const fetchCompanyConfig = async () => {
     try {
+      // Get the first record if multiple exist (handle duplicates)
       const { data, error } = await supabase
         .from('company_config')
         .select('*')
-        .maybeSingle(); // Use maybeSingle() instead of single() to handle no data
+        .limit(1)
+        .maybeSingle();
 
       if (error) throw error;
-      setCompanyConfig(data);
+      setCompanyConfig(data || null);
     } catch (err) {
       console.error('Error fetching company config:', err);
       setError('Failed to load company configuration');

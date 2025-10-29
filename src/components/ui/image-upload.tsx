@@ -61,12 +61,14 @@ export const ImageUpload: React.FC<ImageUploadProps> = ({
       // Check if bucket exists
       const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
       if (bucketError) {
-        throw new Error('Failed to access storage');
-      }
-      
-      const targetBucket = buckets.find(b => b.id === bucket);
-      if (!targetBucket) {
-        throw new Error(`${bucket} storage bucket not found. Please contact administrator.`);
+        console.error('Error listing buckets:', bucketError);
+        // If we can't list buckets, try to proceed anyway - the upload will fail with a clearer error
+        console.warn('Cannot list buckets due to permissions, attempting upload anyway...');
+      } else {
+        const targetBucket = buckets?.find(b => b.id === bucket);
+        if (!targetBucket) {
+          throw new Error(`${bucket} storage bucket not found. Please run the bucket creation script in Supabase SQL editor.`);
+        }
       }
 
       // Generate unique filename
