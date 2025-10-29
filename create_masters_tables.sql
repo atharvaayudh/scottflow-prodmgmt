@@ -1,0 +1,207 @@
+-- Create Masters Tables
+-- Run this first to create the basic table structure
+
+-- ==============================================
+-- 1. PRODUCT CATEGORIES
+-- ==============================================
+CREATE TABLE IF NOT EXISTS product_categories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name VARCHAR(255) NOT NULL,
+  code VARCHAR(50) UNIQUE NOT NULL,
+  description TEXT,
+  parent_id UUID REFERENCES product_categories(id),
+  is_active BOOLEAN DEFAULT TRUE,
+  sort_order INTEGER DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================
+-- 2. FABRIC MASTER
+-- ==============================================
+CREATE TABLE IF NOT EXISTS fabric_master (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  fabric_name VARCHAR(255) NOT NULL,
+  fabric_code VARCHAR(50) UNIQUE NOT NULL,
+  fabric_type VARCHAR(100),
+  composition TEXT,
+  weight_gsm INTEGER,
+  width_cm DECIMAL(5,2),
+  color VARCHAR(100),
+  supplier VARCHAR(255),
+  cost_per_meter DECIMAL(10,2),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================
+-- 3. ITEM MASTER
+-- ==============================================
+CREATE TABLE IF NOT EXISTS item_master (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  item_name VARCHAR(255) NOT NULL,
+  item_code VARCHAR(50) UNIQUE NOT NULL,
+  item_type VARCHAR(100),
+  category_id UUID REFERENCES product_categories(id),
+  description TEXT,
+  unit_of_measure VARCHAR(20),
+  specifications JSONB,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================
+-- 4. BRANDING MASTER
+-- ==============================================
+CREATE TABLE IF NOT EXISTS branding_master (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  brand_name VARCHAR(255) NOT NULL,
+  brand_code VARCHAR(50) UNIQUE NOT NULL,
+  logo_url TEXT,
+  brand_colors JSONB,
+  typography VARCHAR(100),
+  brand_guidelines TEXT,
+  contact_person VARCHAR(255),
+  contact_email VARCHAR(255),
+  contact_phone VARCHAR(20),
+  branding_type VARCHAR(100),
+  placement VARCHAR(255),
+  measurement_unit VARCHAR(50),
+  measurement VARCHAR(100),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================
+-- 5. SIZE MASTER
+-- ==============================================
+CREATE TABLE IF NOT EXISTS size_master (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  size_name VARCHAR(50) NOT NULL,
+  size_code VARCHAR(20) UNIQUE NOT NULL,
+  size_type VARCHAR(50),
+  measurements JSONB,
+  size_chart_url TEXT,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================
+-- 6. CUSTOMIZATION MASTER
+-- ==============================================
+CREATE TABLE IF NOT EXISTS customization_master (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  customization_name VARCHAR(255) NOT NULL,
+  customization_code VARCHAR(50) UNIQUE NOT NULL,
+  customization_type VARCHAR(100),
+  description TEXT,
+  cost_per_unit DECIMAL(10,2),
+  time_required_hours DECIMAL(5,2),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================
+-- 7. CUSTOMER MASTER
+-- ==============================================
+CREATE TABLE IF NOT EXISTS customer_master (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  customer_name VARCHAR(255) NOT NULL,
+  customer_code VARCHAR(50) UNIQUE NOT NULL,
+  customer_type VARCHAR(50),
+  contact_person VARCHAR(255),
+  email VARCHAR(255),
+  phone VARCHAR(20),
+  address TEXT,
+  city VARCHAR(100),
+  state VARCHAR(100),
+  pincode VARCHAR(10),
+  country VARCHAR(100) DEFAULT 'India',
+  gstin VARCHAR(15),
+  pan VARCHAR(10),
+  credit_limit DECIMAL(12,2),
+  payment_terms VARCHAR(100),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================
+-- 8. VENDOR MASTER
+-- ==============================================
+CREATE TABLE IF NOT EXISTS vendor_master (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  vendor_name VARCHAR(255) NOT NULL,
+  vendor_code VARCHAR(50) UNIQUE NOT NULL,
+  vendor_type VARCHAR(50),
+  contact_person VARCHAR(255),
+  email VARCHAR(255),
+  phone VARCHAR(20),
+  address TEXT,
+  city VARCHAR(100),
+  state VARCHAR(100),
+  pincode VARCHAR(10),
+  country VARCHAR(100) DEFAULT 'India',
+  gstin VARCHAR(15),
+  pan VARCHAR(10),
+  bank_details JSONB,
+  payment_terms VARCHAR(100),
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- ==============================================
+-- 9. ENABLE RLS
+-- ==============================================
+ALTER TABLE product_categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE fabric_master ENABLE ROW LEVEL SECURITY;
+ALTER TABLE item_master ENABLE ROW LEVEL SECURITY;
+ALTER TABLE branding_master ENABLE ROW LEVEL SECURITY;
+ALTER TABLE size_master ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customization_master ENABLE ROW LEVEL SECURITY;
+ALTER TABLE customer_master ENABLE ROW LEVEL SECURITY;
+ALTER TABLE vendor_master ENABLE ROW LEVEL SECURITY;
+
+-- ==============================================
+-- 10. CREATE SIMPLE RLS POLICIES
+-- ==============================================
+CREATE POLICY "product_categories_policy" ON product_categories FOR ALL USING (true);
+CREATE POLICY "fabric_master_policy" ON fabric_master FOR ALL USING (true);
+CREATE POLICY "item_master_policy" ON item_master FOR ALL USING (true);
+CREATE POLICY "branding_master_policy" ON branding_master FOR ALL USING (true);
+CREATE POLICY "size_master_policy" ON size_master FOR ALL USING (true);
+CREATE POLICY "customization_master_policy" ON customization_master FOR ALL USING (true);
+CREATE POLICY "customer_master_policy" ON customer_master FOR ALL USING (true);
+CREATE POLICY "vendor_master_policy" ON vendor_master FOR ALL USING (true);
+
+-- ==============================================
+-- 11. INSERT SAMPLE DATA
+-- ==============================================
+INSERT INTO product_categories (name, code, description) VALUES
+('Apparel', 'APP', 'Clothing and fashion items'),
+('Accessories', 'ACC', 'Fashion accessories'),
+('Footwear', 'FOT', 'Shoes and footwear'),
+('Bags', 'BAG', 'Handbags and luggage')
+ON CONFLICT (code) DO NOTHING;
+
+INSERT INTO size_master (size_name, size_code, size_type, measurements) VALUES
+('Small', 'S', 'Clothing', '{"chest": "36", "waist": "30", "length": "28"}'),
+('Medium', 'M', 'Clothing', '{"chest": "38", "waist": "32", "length": "29"}'),
+('Large', 'L', 'Clothing', '{"chest": "40", "waist": "34", "length": "30"}'),
+('Extra Large', 'XL', 'Clothing', '{"chest": "42", "waist": "36", "length": "31"}')
+ON CONFLICT (size_code) DO NOTHING;
+
+INSERT INTO customization_master (customization_name, customization_code, customization_type, description, cost_per_unit, time_required_hours) VALUES
+('Embroidery', 'EMB', 'Embroidery', 'Custom embroidery work', 50.00, 2.0),
+('Screen Printing', 'PRT', 'Printing', 'Screen printing on fabric', 25.00, 1.0),
+('Custom Stitching', 'STI', 'Stitching', 'Custom stitching patterns', 75.00, 3.0),
+('Logo Application', 'LOG', 'Branding', 'Logo application on products', 30.00, 1.5)
+ON CONFLICT (customization_code) DO NOTHING;
+
+SELECT 'Masters tables created successfully!' as status;
