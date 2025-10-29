@@ -4,8 +4,14 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ConfigProvider } from "@/contexts/ConfigContext";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
+import Configurations from "./pages/Configurations";
+import Masters from "./pages/Masters";
+import Factory from "./pages/Factory";
+import Orders from "./pages/Orders";
+import Team from "./pages/Team";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -27,24 +33,27 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <AuthProvider>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Navigate to="/dashboard" />} />
-            <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/orders" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/factories" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/masters" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/users" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            <Route path="/configurations" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </TooltipProvider>
+      <ConfigProvider>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<Navigate to="/dashboard" />} />
+              <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+              <Route path="/factories" element={<ProtectedRoute><Factory /></ProtectedRoute>} />
+              <Route path="/masters" element={<ProtectedRoute><Masters /></ProtectedRoute>} />
+              <Route path="/users" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+              <Route path="/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
+              <Route path="/configurations" element={<ProtectedRoute><Configurations /></ProtectedRoute>} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ConfigProvider>
     </AuthProvider>
   </QueryClientProvider>
 );

@@ -7,6 +7,7 @@ import {
   Factory,
   Database,
   Users,
+  Users2,
   Settings,
   ChevronLeft,
   ChevronRight,
@@ -18,6 +19,7 @@ const menuItems = [
   { icon: ShoppingCart, label: 'Orders', path: '/orders' },
   { icon: Factory, label: 'Factories', path: '/factories' },
   { icon: Database, label: 'Masters', path: '/masters' },
+  { icon: Users2, label: 'Team', path: '/team' },
   { icon: Users, label: 'Users & Roles', path: '/users' },
   { icon: Settings, label: 'Configurations', path: '/configurations' },
 ];
