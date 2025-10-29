@@ -25,6 +25,7 @@ import { Switch } from '@/components/ui/switch';
 import { Plus, Edit, Trash2, Search, Eye, EyeOff } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import ImageUpload from '@/components/ui/image-upload';
 
 export default function People() {
   const [people, setPeople] = useState<any[]>([]);
@@ -38,6 +39,7 @@ export default function People() {
     employee_code: '',
     phone: '',
     email: '',
+    avatar_url: '',
     department_id: '',
     designation_id: '',
     reporting_manager_id: '',
@@ -59,7 +61,14 @@ export default function People() {
   const fetchPeople = async () => {
     try {
       setLoading(true);
-      let query = supabase.from('people').select('*');
+      // Fetch people with joined department and designation names
+      let query = supabase
+        .from('people')
+        .select(`
+          *,
+          department:departments!department_id(department_name, department_code),
+          designation:designations!designation_id(designation_name, designation_code)
+        `);
       
       if (!showInactive) {
         query = query.eq('is_active', true);
@@ -91,13 +100,52 @@ export default function People() {
     setDesignations(data || []);
   };
 
-  const handleAdd = () => {
+  const generateNextEmployeeCode = async (): Promise<string> => {
+    try {
+      // Get all employee codes
+      const { data, error } = await supabase
+        .from('people')
+        .select('employee_code')
+        .like('employee_code', 'EMP-%');
+
+      if (error) throw error;
+
+      if (!data || data.length === 0) {
+        // No employees yet, start with EMP-001
+        return 'EMP-001';
+      }
+
+      // Extract all numbers and find the highest
+      let maxNumber = 0;
+      for (const item of data) {
+        const match = item.employee_code?.match(/EMP-(\d+)/);
+        if (match) {
+          const number = parseInt(match[1], 10);
+          if (number > maxNumber) {
+            maxNumber = number;
+          }
+        }
+      }
+
+      // Generate next code
+      const nextNumber = maxNumber + 1;
+      return `EMP-${nextNumber.toString().padStart(3, '0')}`;
+    } catch (error) {
+      console.error('Error generating employee code:', error);
+      // Fallback on error
+      return 'EMP-001';
+    }
+  };
+
+  const handleAdd = async () => {
     setEditingPerson(null);
+    const nextCode = await generateNextEmployeeCode();
     setFormData({
       employee_name: '',
-      employee_code: '',
+      employee_code: nextCode,
       phone: '',
       email: '',
+      avatar_url: '',
       department_id: '',
       designation_id: '',
       reporting_manager_id: '',
@@ -115,6 +163,7 @@ export default function People() {
       employee_code: person.employee_code || '',
       phone: person.phone || '',
       email: person.email || '',
+      avatar_url: person.avatar_url || '',
       department_id: person.department_id || '',
       designation_id: person.designation_id || '',
       reporting_manager_id: person.reporting_manager_id || '',
@@ -127,10 +176,28 @@ export default function People() {
 
   const handleSave = async () => {
     try {
-      if (!formData.employee_name || !formData.employee_code) {
+      // Validate required fields
+      if (!formData.employee_name) {
         toast({
           title: "Validation Error",
-          description: "Employee name and code are required",
+          description: "Employee name is required",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Ensure employee code exists (auto-generate if missing for new employees)
+      let employeeCode = formData.employee_code;
+      if (!employeeCode && !editingPerson) {
+        employeeCode = await generateNextEmployeeCode();
+        // Update form data so it shows in the form
+        setFormData({ ...formData, employee_code: employeeCode });
+      }
+
+      if (!employeeCode) {
+        toast({
+          title: "Validation Error",
+          description: "Employee code is required",
           variant: "destructive",
         });
         return;
@@ -138,9 +205,10 @@ export default function People() {
 
       const dataToSave = {
         employee_name: formData.employee_name,
-        employee_code: formData.employee_code,
+        employee_code: employeeCode,
         phone: formData.phone || null,
         email: formData.email || null,
+        avatar_url: formData.avatar_url || null,
         department_id: formData.department_id || null,
         designation_id: formData.designation_id || null,
         reporting_manager_id: formData.reporting_manager_id || null,
@@ -246,6 +314,7 @@ export default function People() {
             <TableRow>
               <TableHead>Code</TableHead>
               <TableHead>Name</TableHead>
+              <TableHead>Avatar</TableHead>
               <TableHead>Phone</TableHead>
               <TableHead>Email</TableHead>
               <TableHead>Department</TableHead>
@@ -266,10 +335,33 @@ export default function People() {
                 <TableRow key={person.id}>
                   <TableCell><span className="font-mono text-sm">{person.employee_code}</span></TableCell>
                   <TableCell className="font-medium">{person.employee_name}</TableCell>
+                  <TableCell>
+                    {person.avatar_url ? (
+                      <img src={person.avatar_url} alt={person.employee_name} className="w-12 h-12 rounded-full object-cover border" />
+                    ) : (
+                      <div className="w-12 h-12 rounded-full bg-muted border flex items-center justify-center">
+                        <span className="text-xs text-muted-foreground font-semibold">
+                          {person.employee_name?.charAt(0)?.toUpperCase() || '?'}
+                        </span>
+                      </div>
+                    )}
+                  </TableCell>
                   <TableCell>{person.phone || '-'}</TableCell>
                   <TableCell>{person.email || '-'}</TableCell>
-                  <TableCell>{person.department_id ? 'Dept' : '-'}</TableCell>
-                  <TableCell>{person.designation_id ? 'Desig' : '-'}</TableCell>
+                  <TableCell>
+                    {person.department && typeof person.department === 'object' && person.department.department_name
+                      ? person.department.department_name
+                      : person.department_id
+                      ? departments.find(d => d.id === person.department_id)?.department_name || '-'
+                      : '-'}
+                  </TableCell>
+                  <TableCell>
+                    {person.designation && typeof person.designation === 'object' && person.designation.designation_name
+                      ? person.designation.designation_name
+                      : person.designation_id
+                      ? designations.find(d => d.id === person.designation_id)?.designation_name || '-'
+                      : '-'}
+                  </TableCell>
                   <TableCell>
                     <Badge variant={person.is_active ? "default" : "secondary"}>
                       {person.is_active ? "Active" : "Inactive"}
@@ -310,7 +402,14 @@ export default function People() {
                   placeholder="EMP-001"
                   value={formData.employee_code}
                   onChange={(e) => setFormData({ ...formData, employee_code: e.target.value })}
+                  disabled={!editingPerson}
+                  className={!editingPerson ? "bg-muted" : ""}
                 />
+                {!editingPerson && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Auto-generated
+                  </p>
+                )}
               </div>
               <div>
                 <Label htmlFor="employee_name">Employee Name *</Label>
@@ -338,6 +437,17 @@ export default function People() {
                   placeholder="john@company.com"
                   value={formData.email}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                />
+              </div>
+              <div className="col-span-2">
+                <ImageUpload
+                  label="Avatar"
+                  value={formData.avatar_url}
+                  onChange={(url) => setFormData({ ...formData, avatar_url: url })}
+                  bucket="people-avatars"
+                  folder="avatars"
+                  previewSize="md"
+                  maxSize={5}
                 />
               </div>
               <div>
