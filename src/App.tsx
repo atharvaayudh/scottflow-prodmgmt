@@ -11,7 +11,11 @@ import Configurations from "./pages/Configurations";
 import Masters from "./pages/Masters";
 import Factory from "./pages/Factory";
 import Orders from "./pages/Orders";
+import OrderDetails from "./pages/orders/OrderDetails";
+import Branding from "./pages/Branding";
+import BrandingOrderDetails from "./pages/branding/BrandingOrderDetails";
 import Team from "./pages/Team";
+import Procurement from "./pages/Procurement";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -43,10 +47,14 @@ const App = () => (
               <Route path="/" element={<Navigate to="/dashboard" />} />
               <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/orders" element={<ProtectedRoute><Orders /></ProtectedRoute>} />
+              <Route path="/orders/:id" element={<ProtectedRoute><OrderDetails /></ProtectedRoute>} />
+              <Route path="/branding" element={<ProtectedRoute><Branding /></ProtectedRoute>} />
+              <Route path="/branding/:id" element={<ProtectedRoute><BrandingOrderDetails /></ProtectedRoute>} />
               <Route path="/factories" element={<ProtectedRoute><Factory /></ProtectedRoute>} />
               <Route path="/masters" element={<ProtectedRoute><Masters /></ProtectedRoute>} />
               <Route path="/users" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
               <Route path="/team" element={<ProtectedRoute><Team /></ProtectedRoute>} />
+              <Route path="/procurement" element={<ProtectedRoute><Procurement /></ProtectedRoute>} />
               <Route path="/configurations" element={<ProtectedRoute><Configurations /></ProtectedRoute>} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />

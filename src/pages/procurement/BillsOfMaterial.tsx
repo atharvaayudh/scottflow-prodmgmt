@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -18,17 +19,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Search, Edit, Trash2, Eye, EyeOff } from 'lucide-react';
+import { Search, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 
-export default function ViewOrders() {
+export default function BillsOfMaterial() {
   const navigate = useNavigate();
   const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [showInactive, setShowInactive] = useState(false);
   
   const { toast } = useToast();
 
@@ -39,7 +39,11 @@ export default function ViewOrders() {
   const fetchOrders = async () => {
     try {
       setLoading(true);
-      let query = supabase.from('orders').select('*');
+      let query = supabase
+        .from('orders')
+        .select('*')
+        .neq('status', 'completed') // Exclude completed orders
+        .neq('status', 'cancelled'); // Also exclude cancelled orders
 
       if (statusFilter !== 'all') {
         query = query.eq('status', statusFilter);
@@ -62,8 +66,7 @@ export default function ViewOrders() {
   };
 
   const handleViewOrder = (order: any) => {
-    // Navigate to order details page
-    navigate(`/orders/${order.id}`);
+    navigate(`/orders/${order.id}`, { state: { fromBOM: true } });
   };
 
   const handleDeleteOrder = async (order: any) => {
@@ -93,7 +96,6 @@ export default function ViewOrders() {
       });
     }
   };
-
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -158,6 +160,13 @@ export default function ViewOrders() {
 
   return (
     <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold">Bills of Material</h2>
+          <p className="text-muted-foreground">Orders requiring material procurement (excluding completed orders)</p>
+        </div>
+      </div>
+
       {/* Search and Filters */}
       <div className="flex gap-4">
         <div className="relative flex-1">
@@ -174,94 +183,92 @@ export default function ViewOrders() {
             <SelectValue placeholder="Filter by status" />
           </SelectTrigger>
           <SelectContent>
-            <SelectItem value="all">All Orders</SelectItem>
+            <SelectItem value="all">All Status</SelectItem>
             <SelectItem value="pending">Pending</SelectItem>
             <SelectItem value="confirmed">Confirmed</SelectItem>
             <SelectItem value="in_production">In Production</SelectItem>
-            <SelectItem value="completed">Completed</SelectItem>
-            <SelectItem value="cancelled">Cancelled</SelectItem>
             <SelectItem value="on_hold">On Hold</SelectItem>
           </SelectContent>
         </Select>
-        <Button
-          variant={showInactive ? "default" : "outline"}
-          size="sm"
-          onClick={() => setShowInactive(!showInactive)}
-        >
-          {showInactive ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-        </Button>
       </div>
 
       {/* Orders Table */}
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Order Number</TableHead>
-              <TableHead>Customer</TableHead>
-              <TableHead>Email</TableHead>
-              <TableHead>Phone</TableHead>
-              <TableHead>Total Amount</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Branding Status</TableHead>
-              <TableHead>Delivery Date</TableHead>
-              <TableHead className="w-32">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredOrders.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-gray-500">
-                  No orders found
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredOrders.map((order) => (
-                <TableRow 
-                  key={order.id}
-                  className="cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => handleViewOrder(order)}
-                >
-                  <TableCell className="font-mono">{order.order_number}</TableCell>
-                  <TableCell>{order.customer_name}</TableCell>
-                  <TableCell>{order.customer_email || '-'}</TableCell>
-                  <TableCell>{order.customer_phone || '-'}</TableCell>
-                  <TableCell className="font-semibold">₹{order.total_amount?.toFixed(2) || '0.00'}</TableCell>
-                  <TableCell>
-                    <Badge variant={getStatusColor(order.status)}>
-                      {order.status?.replace('_', ' ').toUpperCase() || 'PENDING'}
-                    </Badge>
-                  </TableCell>
-                  <TableCell>
-                    {order.branding_status ? (
-                      <Badge variant={getBrandingStatusColor(order.branding_status)}>
-                        {getBrandingStatusLabel(order.branding_status)}
-                      </Badge>
-                    ) : (
-                      <span className="text-muted-foreground text-sm">-</span>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {order.delivery_date ? new Date(order.delivery_date).toLocaleDateString() : '-'}
-                  </TableCell>
-                  <TableCell onClick={(e) => e.stopPropagation()}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteOrder(order);
-                      }}
-                    >
-                      <Trash2 className="h-4 w-4 text-red-500" />
-                    </Button>
-                  </TableCell>
+      <Card>
+        <CardHeader>
+          <CardTitle>Orders for Material Procurement</CardTitle>
+          <CardDescription>All non-completed orders that require material procurement</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Order Number</TableHead>
+                  <TableHead>Customer</TableHead>
+                  <TableHead>Email</TableHead>
+                  <TableHead>Phone</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>Branding Status</TableHead>
+                  <TableHead>Delivery Date</TableHead>
+                  <TableHead className="w-32">Actions</TableHead>
                 </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
+              </TableHeader>
+              <TableBody>
+                {filteredOrders.length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={8} className="text-center py-8 text-gray-500">
+                      {loading ? 'Loading...' : 'No orders found'}
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  filteredOrders.map((order) => (
+                    <TableRow 
+                      key={order.id}
+                      className="cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => handleViewOrder(order)}
+                    >
+                      <TableCell className="font-mono">{order.order_number}</TableCell>
+                      <TableCell>{order.customer_name}</TableCell>
+                      <TableCell>{order.customer_email || '-'}</TableCell>
+                      <TableCell>{order.customer_phone || '-'}</TableCell>
+                      <TableCell>
+                        <Badge variant={getStatusColor(order.status)}>
+                          {order.status?.replace('_', ' ').toUpperCase() || 'PENDING'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell>
+                        {order.branding_status ? (
+                          <Badge variant={getBrandingStatusColor(order.branding_status)}>
+                            {getBrandingStatusLabel(order.branding_status)}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground text-sm">-</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {order.delivery_date ? new Date(order.delivery_date).toLocaleDateString() : '-'}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteOrder(order);
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4 text-red-500" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }
+

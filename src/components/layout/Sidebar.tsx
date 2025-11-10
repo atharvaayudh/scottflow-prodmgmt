@@ -11,13 +11,18 @@ import {
   Settings,
   ChevronLeft,
   ChevronRight,
+  Palette,
+  ShoppingBag,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useCompanyBranding } from '@/hooks/use-company-branding';
 
 const menuItems = [
   { icon: LayoutDashboard, label: 'Dashboard', path: '/dashboard' },
   { icon: ShoppingCart, label: 'Orders', path: '/orders' },
   { icon: Factory, label: 'Factories', path: '/factories' },
+  { icon: Palette, label: 'Branding', path: '/branding' },
+  { icon: ShoppingBag, label: 'Procurement', path: '/procurement' },
   { icon: Database, label: 'Masters', path: '/masters' },
   { icon: Users2, label: 'Team', path: '/team' },
   { icon: Users, label: 'Users & Roles', path: '/users' },
@@ -27,6 +32,7 @@ const menuItems = [
 export default function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { sidebarLogo, companyName } = useCompanyBranding();
 
   return (
     <aside
@@ -40,15 +46,33 @@ export default function Sidebar() {
         <div className="h-16 flex items-center justify-center border-b border-border px-4">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-                <span className="text-sm font-bold text-primary-foreground">SI</span>
-              </div>
-              <span className="font-semibold text-foreground">Scott International</span>
+              {sidebarLogo ? (
+                <img
+                  src={sidebarLogo}
+                  alt={`${companyName} Logo`}
+                  className="h-10 w-auto object-contain"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                  <span className="text-sm font-bold text-primary-foreground">SI</span>
+                </div>
+              )}
+              <span className="font-semibold text-foreground">{companyName}</span>
             </div>
           )}
           {collapsed && (
-            <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
-              <span className="text-sm font-bold text-primary-foreground">SI</span>
+            <div className="flex items-center justify-center">
+              {sidebarLogo ? (
+                <img
+                  src={sidebarLogo}
+                  alt={`${companyName} Logo`}
+                  className="h-10 w-auto object-contain"
+                />
+              ) : (
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center">
+                  <span className="text-sm font-bold text-primary-foreground">SI</span>
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -13,9 +13,10 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Trash2, Save, UserPlus } from 'lucide-react';
+import { Plus, Trash2, Save, UserPlus, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import MultiImageUpload from '@/components/ui/multi-image-upload';
 import {
   Dialog,
   DialogContent,
@@ -30,18 +31,28 @@ interface SizeQuantity {
   quantity: number;
 }
 
+interface BrandingDetails {
+  branding_type_id: string;
+  placement: string;
+  measurement: string;
+}
+
 interface OrderItem {
   id: string;
   product_category: string;
   fabric_name: string;
   fabric_color: string;
   fabric_gsm: string;
+  fabric_code?: string;
+  fabric_type?: string;
+  composition?: string;
   size_type: string;
   size_quantities: SizeQuantity[];
   unit_price: number;
   total_price: number;
   gst_percent?: number;
   remarks: string;
+  branding: BrandingDetails[];
 }
 
 interface CreateOrdersProps {
@@ -56,8 +67,14 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
     customer_phone: '',
     delivery_date: '',
     notes: '',
-    assigned_factory_id: ''
+    assigned_factory_id: '',
+    sales_team_id: ''
   });
+
+  // Order images state
+  const [mockupImages, setMockupImages] = useState<string[]>([]);
+  const [referenceImages, setReferenceImages] = useState<string[]>([]);
+  const [attachmentImages, setAttachmentImages] = useState<string[]>([]);
   
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false);
   const [newCustomer, setNewCustomer] = useState({
@@ -73,6 +90,9 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
   const [categories, setCategories] = useState<any[]>([]);
   const [fabrics, setFabrics] = useState<any[]>([]);
   const [sizeTypes, setSizeTypes] = useState<any[]>([]);
+  const [brandingTypes, setBrandingTypes] = useState<any[]>([]);
+  const [salesTeam, setSalesTeam] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<any[]>([]);
   
   const [newItem, setNewItem] = useState({
     product_category: '',
@@ -83,7 +103,8 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
     size_quantities: [] as SizeQuantity[],
     unit_price: 0,
     gst_percent: 0,
-    remarks: ''
+    remarks: '',
+    branding: [] as BrandingDetails[]
   });
   
   const [selectedSizeType, setSelectedSizeType] = useState<any>(null);
@@ -120,8 +141,19 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
     fetchCategories();
     fetchFabrics();
     fetchSizeTypes();
+    fetchBrandingTypes();
+    fetchDepartments();
     generateOrderNumber();
   }, []);
+
+  useEffect(() => {
+    // Fetch sales team when departments are loaded
+    if (departments.length > 0) {
+      fetchSalesTeam();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [departments]);
+
 
   const fetchCustomers = async () => {
     const { data } = await supabase
@@ -161,6 +193,58 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
       .select('*')
       .eq('is_active', true);
     setSizeTypes(data || []);
+  };
+
+  const fetchBrandingTypes = async () => {
+    const { data } = await supabase
+      .from('branding_master')
+      .select('*')
+      .eq('is_active', true);
+    setBrandingTypes(data || []);
+  };
+
+  const fetchDepartments = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('departments')
+        .select('*')
+        .eq('is_active', true);
+      
+      if (error) throw error;
+      setDepartments(data || []);
+    } catch (error) {
+      console.error('Error fetching departments:', error);
+    }
+  };
+
+  const fetchSalesTeam = async () => {
+    try {
+      // Find Sales department
+      const salesDept = departments.find(d => 
+        d.department_name?.toLowerCase().includes('sales') || 
+        d.department_code?.toLowerCase().includes('sales')
+      );
+      
+      if (!salesDept) {
+        console.warn('Sales department not found');
+        setSalesTeam([]);
+        return;
+      }
+
+      // Fetch people from Sales department
+      const { data, error } = await supabase
+        .from('people')
+        .select('*')
+        .eq('department_id', salesDept.id)
+        .eq('is_active', true)
+        .order('employee_name', { ascending: true });
+      
+      if (error) throw error;
+      setSalesTeam(data || []);
+    } catch (error) {
+      console.error('Error fetching sales team:', error);
+      setSalesTeam([]);
+    }
   };
 
   const generateOrderNumber = () => {
@@ -324,18 +408,27 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
 
     const totalQuantity = newItem.size_quantities.reduce((sum, sq) => sum + sq.quantity, 0);
 
+    // Get full fabric details from selected fabric
+    const fabricDetails = selectedFabric ? {
+      fabric_code: selectedFabric.fabric_code,
+      fabric_type: selectedFabric.fabric_type,
+      composition: selectedFabric.composition
+    } : {};
+
     const itemToAdd: OrderItem = {
       id: Date.now().toString(),
       product_category: newItem.product_category,
       fabric_name: newItem.fabric_name,
       fabric_color: newItem.fabric_color,
       fabric_gsm: newItem.fabric_gsm,
+      ...fabricDetails,
       size_type: newItem.size_type,
       size_quantities: newItem.size_quantities,
       unit_price: newItem.unit_price,
       total_price: totalQuantity * newItem.unit_price * (1 + (newItem.gst_percent || 0) / 100),
       remarks: newItem.remarks,
-      gst_percent: newItem.gst_percent
+      gst_percent: newItem.gst_percent,
+      branding: [...newItem.branding] // Copy branding array
     };
 
     setOrderItems([...orderItems, itemToAdd]);
@@ -348,7 +441,8 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
       size_quantities: [],
       unit_price: 0,
       gst_percent: 0,
-      remarks: ''
+      remarks: '',
+      branding: []
     });
     setSelectedSizeType(null);
     setSelectedFabric(null);
@@ -404,7 +498,8 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
             total_amount: totalAmount,
             notes: orderData.notes || null,
             delivery_date: orderData.delivery_date || null,
-            assigned_factory_id: orderData.assigned_factory_id || null
+            assigned_factory_id: orderData.assigned_factory_id || null,
+            sales_team_id: orderData.sales_team_id || null
           }
         ])
         .select();
@@ -425,11 +520,18 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
           gst_percent: item.gst_percent || 0,
           gst_amount: (totalQuantity * item.unit_price) * ((item.gst_percent || 0) / 100),
           specifications: JSON.stringify({
-            category: item.product_category,
-            fabric: item.fabric,
-            size_type: item.size_type,
-            sizes: item.size_quantities,
-            remarks: item.remarks
+            category: item.product_category || null,
+            fabric_name: item.fabric_name || null,
+            fabric_color: item.fabric_color || null,
+            fabric_gsm: item.fabric_gsm || null,
+            fabric: item.fabric_name || null, // Keep for backward compatibility
+            fabric_code: item.fabric_code || null,
+            fabric_type: item.fabric_type || null,
+            composition: item.composition || null,
+            size_type: item.size_type || null,
+            sizes: item.size_quantities || [],
+            remarks: item.remarks || null,
+            branding: item.branding || []
           })
         };
       });
@@ -439,6 +541,59 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
         .insert(orderItemsToInsert);
 
       if (itemsError) throw itemsError;
+
+      // Save order attachments/images (without branding - branding is now at item level)
+      const attachmentsToInsert = [];
+      
+      // Mockup images
+      mockupImages.forEach(url => {
+        attachmentsToInsert.push({
+          order_id: orderId,
+          file_type: 'mockup',
+          file_url: url,
+          file_name: url.split('/').pop() || 'mockup.jpg',
+          branding_type_id: null,
+          placement: null,
+          measurement: null,
+        });
+      });
+
+      // Reference images
+      referenceImages.forEach(url => {
+        attachmentsToInsert.push({
+          order_id: orderId,
+          file_type: 'reference',
+          file_url: url,
+          file_name: url.split('/').pop() || 'reference.jpg',
+          branding_type_id: null,
+          placement: null,
+          measurement: null,
+        });
+      });
+
+      // Attachments
+      attachmentImages.forEach(url => {
+        attachmentsToInsert.push({
+          order_id: orderId,
+          file_type: 'attachment',
+          file_url: url,
+          file_name: url.split('/').pop() || 'attachment.jpg',
+          branding_type_id: null,
+          placement: null,
+          measurement: null,
+        });
+      });
+
+      if (attachmentsToInsert.length > 0) {
+        const { error: attachmentsError } = await supabase
+          .from('order_attachments')
+          .insert(attachmentsToInsert);
+
+        if (attachmentsError) {
+          console.error('Error saving attachments:', attachmentsError);
+          // Don't throw - attachments are optional
+        }
+      }
 
       toast({
         title: "Success",
@@ -453,9 +608,13 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
         customer_phone: '',
         delivery_date: '',
         notes: '',
-        assigned_factory_id: ''
+        assigned_factory_id: '',
+        sales_team_id: ''
       });
       setOrderItems([]);
+      setMockupImages([]);
+      setReferenceImages([]);
+      setAttachmentImages([]);
       generateOrderNumber();
       onOrderCreated();
     } catch (error: any) {
@@ -478,7 +637,7 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
           <CardTitle>Order Details</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
             <div>
               <Label htmlFor="order_number">Order Number *</Label>
               <Input
@@ -535,6 +694,66 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
                 value={orderData.delivery_date}
                 onChange={(e) => setOrderData({ ...orderData, delivery_date: e.target.value })}
               />
+            </div>
+
+            <div>
+              <Label htmlFor="sales_team_id">Sales Team</Label>
+              <Select
+                value={orderData.sales_team_id || undefined}
+                onValueChange={(value) => setOrderData({ ...orderData, sales_team_id: value })}
+                disabled={salesTeam.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={salesTeam.length === 0 ? "No sales team members found" : "Select sales team member"} />
+                </SelectTrigger>
+                <SelectContent>
+                  {salesTeam.length > 0 ? (
+                    salesTeam.map((person) => (
+                      <SelectItem key={person.id} value={person.id}>
+                        <div className="flex items-center gap-2">
+                          {person.avatar_url ? (
+                            <img 
+                              src={person.avatar_url} 
+                              alt={person.employee_name} 
+                              className="w-10 h-10 rounded-full object-cover border" 
+                            />
+                          ) : (
+                            <div className="w-10 h-10 rounded-full bg-muted border flex items-center justify-center flex-shrink-0">
+                              <span className="text-xs text-muted-foreground font-semibold">
+                                {person.employee_name?.charAt(0)?.toUpperCase() || '?'}
+                              </span>
+                            </div>
+                          )}
+                          <span>{person.employee_name}</span>
+                        </div>
+                      </SelectItem>
+                    ))
+                  ) : (
+                    <div className="px-2 py-1.5 text-sm text-muted-foreground">
+                      No sales team members found
+                    </div>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div>
+              <Label htmlFor="assigned_factory_id">Assigned Factory</Label>
+              <Select
+                value={orderData.assigned_factory_id}
+                onValueChange={(value) => setOrderData({ ...orderData, assigned_factory_id: value })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Select factory" />
+                </SelectTrigger>
+                <SelectContent>
+                  {factories.map((factory) => (
+                    <SelectItem key={factory.id} value={factory.id}>
+                      {factory.factory_name || factory.name} - {factory.factory_code || factory.code}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
           </div>
@@ -735,6 +954,111 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
               </div>
             </div>
 
+            {/* Branding Details Section */}
+            <div className="space-y-3 pt-2 border-t">
+              <div className="flex items-center justify-between">
+                <Label className="text-sm font-medium">Branding Details</Label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setNewItem({
+                      ...newItem,
+                      branding: [...newItem.branding, {
+                        branding_type_id: '',
+                        placement: '',
+                        measurement: ''
+                      }]
+                    });
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Branding
+                </Button>
+              </div>
+
+              {newItem.branding.length > 0 ? (
+                <div className="space-y-3">
+                  {newItem.branding.map((branding, index) => (
+                    <div key={index} className="p-3 border rounded-lg space-y-2 bg-muted/30">
+                      <div className="flex items-center justify-between mb-2">
+                        <Label className="text-xs font-medium">Branding #{index + 1}</Label>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            setNewItem({
+                              ...newItem,
+                              branding: newItem.branding.filter((_, i) => i !== index)
+                            });
+                          }}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      <div className="grid grid-cols-3 gap-3">
+                        <div>
+                          <Label className="text-xs">Branding Type</Label>
+                          <Select
+                            value={branding.branding_type_id}
+                            onValueChange={(value) => {
+                              const updatedBranding = [...newItem.branding];
+                              updatedBranding[index].branding_type_id = value;
+                              setNewItem({ ...newItem, branding: updatedBranding });
+                            }}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {brandingTypes.map((bt) => (
+                                <SelectItem key={bt.id} value={bt.id}>
+                                  {bt.branding_type || bt.brand_name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        
+                        <div>
+                          <Label className="text-xs">Placement</Label>
+                          <Input
+                            placeholder="e.g., Chest, Back"
+                            value={branding.placement}
+                            onChange={(e) => {
+                              const updatedBranding = [...newItem.branding];
+                              updatedBranding[index].placement = e.target.value;
+                              setNewItem({ ...newItem, branding: updatedBranding });
+                            }}
+                          />
+                        </div>
+                        
+                        <div>
+                          <Label className="text-xs">Measurement</Label>
+                          <Input
+                            placeholder="e.g., 10x5 cm"
+                            value={branding.measurement}
+                            onChange={(e) => {
+                              const updatedBranding = [...newItem.branding];
+                              updatedBranding[index].measurement = e.target.value;
+                              setNewItem({ ...newItem, branding: updatedBranding });
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground text-center py-2">
+                  No branding details added. Click "Add Branding" to add one.
+                </p>
+              )}
+            </div>
+
             <div>
               <Button onClick={handleAddItem} className="w-full">
                 <Plus className="h-4 w-4 mr-2" />
@@ -858,6 +1182,58 @@ export default function CreateOrders({ onOrderCreated }: CreateOrdersProps) {
               </div>
             );
           })()}
+        </CardContent>
+      </Card>
+
+      {/* Order Images & Attachments Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Order Images & Attachments</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Mockup Images */}
+          <div className="space-y-4">
+            <MultiImageUpload
+              label="Mockup Images"
+              value={mockupImages}
+              onChange={setMockupImages}
+              bucket="order-images"
+              folder="mockups"
+              maxFiles={10}
+              maxSize={10}
+            />
+            
+          </div>
+
+          {/* Reference Images */}
+          <div className="space-y-4">
+            <MultiImageUpload
+              label="Reference Images"
+              value={referenceImages}
+              onChange={setReferenceImages}
+              bucket="order-images"
+              folder="references"
+              maxFiles={10}
+              maxSize={10}
+            />
+            
+          </div>
+
+          {/* Attachments */}
+          <div className="space-y-4">
+            <MultiImageUpload
+              label="Attachments"
+              value={attachmentImages}
+              onChange={setAttachmentImages}
+              bucket="order-images"
+              folder="attachments"
+              maxFiles={10}
+              maxSize={10}
+              allowAllFiles={true}
+              accept="*/*"
+            />
+            
+          </div>
         </CardContent>
       </Card>
 

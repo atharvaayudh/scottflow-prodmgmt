@@ -11,10 +11,12 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { LogOut, User } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { useCompanyBranding } from '@/hooks/use-company-branding';
 
 export default function Header() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  const { headerLogo, companyName } = useCompanyBranding();
 
   const handleLogout = () => {
     logout();
@@ -33,7 +35,14 @@ export default function Header() {
   return (
     <header className="fixed top-0 right-0 left-64 h-16 bg-card border-b border-border z-20">
       <div className="flex items-center justify-between h-full px-6">
-        <div>
+        <div className="flex items-center gap-3">
+          {headerLogo && (
+            <img
+              src={headerLogo}
+              alt={`${companyName} Logo`}
+              className="h-10 w-auto object-contain"
+            />
+          )}
           <h2 className="text-lg font-semibold text-foreground">Production Management</h2>
         </div>
 

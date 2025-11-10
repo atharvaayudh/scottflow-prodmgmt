@@ -30,7 +30,8 @@ import {
   EyeOff,
   Image as ImageIcon,
   Grid3X3,
-  List
+  List,
+  ExternalLink
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -518,7 +519,7 @@ export default function SizeMasterWithUpload() {
             <Button variant="outline" onClick={() => setIsDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={saveData} disabled={uploading}>
+            <Button onClick={saveData}>
               {editingItem ? 'Update' : 'Create'}
             </Button>
           </DialogFooter>

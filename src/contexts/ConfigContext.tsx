@@ -159,30 +159,89 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
 
   const uploadBrandingAsset = async (file: File, assetType: 'header_logo' | 'sidebar_logo' | 'authorized_signatory') => {
     try {
-      // Check if storage bucket exists
-      const { data: buckets, error: bucketError } = await supabase.storage.listBuckets();
-      if (bucketError) {
-        console.error('Error listing buckets:', bucketError);
-        throw new Error('Failed to access storage');
-      }
-      
-      const brandingBucket = buckets.find(bucket => bucket.id === 'branding-assets');
-      if (!brandingBucket) {
-        throw new Error('Branding assets storage bucket not found. Please contact administrator.');
-      }
-
-      // Upload file to Supabase Storage
+      // Upload file to Supabase Storage directly
+      // If bucket doesn't exist, Supabase will give us a clearer error
       const fileExt = file.name.split('.').pop();
       const fileName = `${assetType}_${Date.now()}.${fileExt}`;
       const filePath = `branding/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
+      const { data: uploadData, error: uploadError } = await supabase.storage
         .from('branding-assets')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) {
         console.error('Storage upload error:', uploadError);
-        throw new Error(`Storage error: ${uploadError.message}`);
+        
+        // Provide clearer error messages
+        if (uploadError.message?.includes('Bucket not found') || uploadError.message?.includes('not found')) {
+          throw new Error('Branding assets storage bucket not found. Please run the SQL script to create it.');
+        } else if (uploadError.message?.includes('new row violates row-level security policy')) {
+          throw new Error('Storage permission denied. Please check storage policies.');
+        } else if (uploadError.message?.includes('duplicate')) {
+          // File already exists, try with a different name
+          const retryFileName = `${assetType}_${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
+          const retryPath = `branding/${retryFileName}`;
+          
+          const { error: retryError } = await supabase.storage
+            .from('branding-assets')
+            .upload(retryPath, file, {
+              cacheControl: '3600',
+              upsert: false
+            });
+          
+          if (retryError) {
+            throw new Error(`Storage error: ${retryError.message}`);
+          }
+          
+          // Use retryPath for URL generation
+          const { data: { publicUrl } } = supabase.storage
+            .from('branding-assets')
+            .getPublicUrl(retryPath);
+
+          // Deactivate existing asset of this type
+          const { error: deactivateError } = await supabase
+            .from('branding_assets')
+            .update({ is_active: false })
+            .eq('asset_type', assetType)
+            .eq('is_active', true);
+
+          if (deactivateError) {
+            console.error('Deactivate error:', deactivateError);
+          }
+
+          // Create new asset record
+          const { data, error } = await supabase
+            .from('branding_assets')
+            .insert([{
+              asset_type: assetType,
+              asset_name: file.name,
+              file_path: publicUrl,
+              file_size: file.size,
+              mime_type: file.type,
+              is_active: true,
+            }])
+            .select()
+            .single();
+
+          if (error) {
+            console.error('Database insert error:', error);
+            throw new Error(`Database error: ${error.message}`);
+          }
+
+          // Update local state
+          setBrandingAssets(prev => ({
+            ...prev,
+            [assetType === 'header_logo' ? 'headerLogo' : 
+             assetType === 'sidebar_logo' ? 'sidebarLogo' : 'authorizedSignatory']: data
+          }));
+
+          return; // Exit early since we handled the duplicate case
+        } else {
+          throw new Error(`Upload failed: ${uploadError.message}`);
+        }
       }
 
       // Get file URL
@@ -221,12 +280,15 @@ export const ConfigProvider: React.FC<ConfigProviderProps> = ({ children }) => {
         throw new Error(`Database error: ${error.message}`);
       }
 
-      // Update local state
-      setBrandingAssets(prev => ({
-        ...prev,
-        [assetType === 'header_logo' ? 'headerLogo' : 
-         assetType === 'sidebar_logo' ? 'sidebarLogo' : 'authorizedSignatory']: data
-      }));
+          // Update local state
+          setBrandingAssets(prev => ({
+            ...prev,
+            [assetType === 'header_logo' ? 'headerLogo' : 
+             assetType === 'sidebar_logo' ? 'sidebarLogo' : 'authorizedSignatory']: data
+          }));
+
+          // Refresh branding assets to ensure UI updates
+          await fetchBrandingAssets();
 
     } catch (err) {
       console.error('Error uploading branding asset:', err);
